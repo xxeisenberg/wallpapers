@@ -21,35 +21,39 @@ IFS=$'\n' read -rd '' -a FILE_ARRAY <<< "$FILES"
 # Calculate total number of files
 TOTAL_FILES=${#FILE_ARRAY[@]}
 BATCH_SIZE=100
-BATCHES=$(( (TOTAL_FILES + BATCH_SIZE - 1) / BATCH_SIZE ))
 
 echo "Total files to push: $TOTAL_FILES"
-echo "Will push in $BATCHES batches of $BATCH_SIZE files"
 
-# Process files in batches
-for ((i = 0; i < TOTAL_FILES; i += BATCH_SIZE)); do
-    echo "Processing batch $((i/BATCH_SIZE + 1)) of $BATCHES"
+# Counter for processed files
+COUNTER=0
 
-    # Add files in current batch
-    for ((j = i; j < i + BATCH_SIZE && j < TOTAL_FILES; j++)); do
-        FILE="${FILE_ARRAY[j]}"
+while [ $COUNTER -lt $TOTAL_FILES ]; do
+    echo "Processing files $((COUNTER + 1)) to $((COUNTER + BATCH_SIZE))"
+
+    # Reset any staged changes
+    git reset --mixed HEAD
+
+    # Add next batch of files
+    for ((i = COUNTER; i < COUNTER + BATCH_SIZE && i < TOTAL_FILES; i++)); do
+        FILE="${FILE_ARRAY[i]}"
         echo "Adding: $FILE"
         git add "$FILE"
     done
 
-    # Commit current batch
-    git commit -m "Batch $((i/BATCH_SIZE + 1))/$BATCHES: Adding files $((i+1)) to $((i + BATCH_SIZE))"
-
-    # Push current batch
+    # Commit and push this batch
+    git commit -m "Adding files $((COUNTER + 1)) to $((COUNTER + BATCH_SIZE))"
     git push
 
     if [ $? -ne 0 ]; then
-        echo "Error pushing batch $((i/BATCH_SIZE + 1)). Stopping."
+        echo "Error pushing files. Stopping."
         exit 1
     fi
 
-    echo "Batch $((i/BATCH_SIZE + 1)) completed successfully"
+    # Increment counter
+    COUNTER=$((COUNTER + BATCH_SIZE))
+
+    echo "Batch completed successfully"
     echo "-------------------------------------------"
 done
 
-echo "All batches pushed successfully"
+echo "All files pushed successfully"
